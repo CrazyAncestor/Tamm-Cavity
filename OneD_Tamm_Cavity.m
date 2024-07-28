@@ -20,26 +20,31 @@ DBR = make_DBR(d_Si,n_Si,d_Vac,n_Vac,DBR_layer);
 Tamm = make_Tamm(DBR, d_Au, n_Au);
 
 %   Wavenumbers
-k = 2*pi*linspace(0.6/(lambda0),1.4/(lambda0),1001);
+k = 2*pi*linspace(0.6/(lambda0),1.4/(lambda0),10001);
 
 %   Calculate DBR and Tamm cavity reflection coefficients for different
 %   wavenumbers
 reflections_Tamm = [];
+theta_Tamm = [];
 reflections_DBR = [];
+theta_DBR = [];
 
 for i=1:length(k)
     [r_DBR, field_DBR] = TMM_analysis(k(i),DBR,0);
     [r_Tamm, field_Tamm] = TMM_analysis(k(i),Tamm,0);
-    reflections_DBR = [reflections_DBR , r_DBR];
-    reflections_Tamm = [reflections_Tamm , r_Tamm];
+    reflections_DBR = [reflections_DBR , abs(r_DBR)^2];
+    reflections_Tamm = [reflections_Tamm , abs(r_Tamm)^2];
+    theta_Tamm = [theta_Tamm,angle(r_Tamm)];
+    theta_DBR = [theta_DBR,angle(r_DBR)];
 end
 
-%   Calculate Tamm mode field distribution
+%   Calculate Tamm mode field enhancement
 [min_value, k_idx] = min(reflections_Tamm);
 [r_Tamm, field_Tamm] = TMM_analysis(k(k_idx),Tamm,100);
 
 %   Plot reflection coefficients vs. frequency
 figure
+title('Reflection coefficient vs. frequency')
 hold on
 
 plot(k*lambda0/2/pi,reflections_Tamm)
@@ -52,8 +57,13 @@ ylabel('Reflection')
 
 hold off
 
-%   Plot Tamm mode field frequency
+%   Smith Chart
+Smith_Chart(reflections_DBR,theta_DBR,'Smith Chart (DBR cavity)')
+Smith_Chart(reflections_Tamm,theta_Tamm,'Smith Chart (Tamm cavity)')
+
+%   Plot Tamm mode field enhancement
 figure
+title('Tamm mode enhancement')
 hold on
 x = field_Tamm(1,:);
 E = field_Tamm(2,:);
@@ -85,7 +95,7 @@ function M = transfer_matrix(k,d,n)
     M = [cos(delta),sin(delta)/n*1i;sin(delta)*n*1i,cos(delta)];
 end
 
-%   Electric field amplitude spatial distribution for multilayer structure
+%   Electric field amplitude spatial enhancement for multilayer structure
 function [r, field] = TMM_analysis(k,parameters,N_mesh)
     
     %   Giving thickness and refractive index
@@ -121,7 +131,7 @@ function [r, field] = TMM_analysis(k,parameters,N_mesh)
     %   Calculating reflection coefficients
     n_eff = E_H(2) / E_H(1);
     r = (1-n_eff) / (1+n_eff);
-    r = r * conj(r);
+
 end
 
 function DBR = make_DBR(d1,n1,d2,n2,N)
@@ -150,4 +160,23 @@ function Tamm = make_Tamm(DBR,d_metal,n_metal)
     d = [d,d_metal];
     n = [n,n_metal];
     Tamm = [d;n];
+end
+
+function Smith_Chart(amp,ang,title_name)
+    figure
+    title(title_name)
+    hold on
+    x_smith = [];
+    y_smith = [];
+    for i=1:length(ang)
+        x_smith = [x_smith,amp(i)^0.5*cos(ang(i))];
+        y_smith = [y_smith,amp(i)^0.5*sin(ang(i))];
+    end
+    plot(x_smith,y_smith);
+    hold off
+    grid("on")
+    ax = gca;
+    ax.XAxisLocation = 'origin';
+    ax.YAxisLocation = 'origin';
+    axis([-1 1 -1 1])
 end
