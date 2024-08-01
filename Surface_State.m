@@ -13,101 +13,37 @@ d_Si = 0.75*lambda0/n_Si;
 d_Vac = 0.25*lambda0/n_Vac;
 
 %       DBR mirror multilayer total number
-DBR_layer = 111;
+DBR_layer = 7;
 
-%   Give frequencies and parameters.
-w = 2*pi* linspace(0.,2,1000)/lambda0/n_Vac;
-a = lambda0/4/n_Vac + lambda0*3/4/n_Si;
+%   Give frequencies and unit cell length.
+w = 2*pi* linspace(0.,2,1000)/lambda0/n_Vac; % Angular frequencies
+a = lambda0/4/n_Vac + lambda0*3/4/n_Si; % Unit cell length
+One_THz = 2*pi* 1/lambda0/n_Vac;
 
-%   Calculate the band structure
-k = bandstructure(w,a,d_Vac,n_Vac,d_Si,n_Si);
-att = bandstructure(2*pi* 1/lambda0/n_Vac,a,d_Vac,n_Vac,d_Si,n_Si)
-
+%   Calculate and plot the band structure
+[k,w] = bandstructure(w,a,d_Vac,n_Vac,d_Si,n_Si);
 plot(k/2/pi*a,w/2/pi*lambda0);
 xlabel('k (2\pi/a)')
 ylabel('Frequency(THz)')
 
-%   Calculate DBR field
+%   Calculate and plot DBR field of 1THz
 DBR = make_DBR(d_Si,n_Si,d_Vac,n_Vac,DBR_layer);
-reflections_DBR = [];
+[r_DBR_1THz, field_DBR_1THz] = TMM_analysis(One_THz,DBR,100);
+plot_field('DBR field enhancement',field_DBR_1THz,DBR_layer,d_Si,d_Vac)
 
-for i=1:length(k)
-    [r_DBR, field_DBR] = TMM_analysis(w(i),DBR,0);
-    [r_Tamm, field_Tamm] = TMM_analysis(w(i),Tamm,0);
-    reflections_DBR = [reflections_DBR , abs(r_DBR)^2];
-end
+%   Get the attenuation factor in DBR of 1THz
+[k_1THz,w_1THz] = bandstructure([One_THz],a,d_Vac,n_Vac,d_Si,n_Si);
+attenuation_1THz_through_dispersion = imag(k_1THz)
+attenuation_1THz_fitting_from_field = Get_Attenuation([One_THz],DBR,100)
 
-%   Calculate DBR field
-[min_value, w_idx] = max(reflections_DBR);
-[r_DBR, field_DBR] = TMM_analysis(w(w_idx),DBR,100);
-attenuation = Get_Attenuation(w(k_idx),DBR,100)
-
-%   Plot DBR field enhancement
-plot_field('DBR field enhancement',field_DBR,DBR_layer,d_Si,d_Vac)
-
-
-function DBR = make_DBR_unit_cells(d1,n1,d2,n2)
-    
-    %   Define list of thickness d and refractive index n
-    d = [];
-    n = [];
-
-    %   Assign element value, first layer is material 1 (d1,n1), second
-    %   layer is material 2 (d2,n2), and so on.
-    for m=1:3
-        if mod(m,2)==1
-            d = [d,d1/2.];
-            n = [n,n1];
-        else
-            d = [d,d2];
-            n = [n,n2];
-        end
-    end
-    DBR = [d;n];
-end
-
-%   Transmission coefficient calculation
-function [r,t] = rt_analysis(K,parameters)
-    
-    %   Giving thickness and refractive index
-    d = parameters(1,:);
-    n = parameters(2,:);
-    
-    t = [];
-    r = [];
-    for j = 1:length(K)
-        %   Defining variables
-        E_H_exit = [1;1]; % E and H fields at the end of the multilayer
-        x = [sum(d)];
-        x_present = sum(d);
-        E = [1];
-        E_H = E_H_exit;
-        
-        %   Calculating the E,H fields with transfer matrices
-        N = length(d);
-        for m=1:N
-            ms = N-m+1;
-            M = transfer_matrix(K(j),d(ms),n(ms));
-            E_H = M * E_H;
-        end
-        field = [x;E/E(length(E))];
-        
-        %   Calculating reflection coefficients
-        n_eff = E_H(2) / E_H(1);
-        r0 = (1-n_eff) / (1+n_eff);
-        t0 = 2 / (E_H(2)+E_H(1));
-        r = [r,r0];
-        t = [t,t0];
-    end
-end
-
+    %   Functions
 %   Transfer matrix formula (Macleod, H. A. (Hugh A. (2001). Thin-film optical filters / H.A. Macleod. (Third edition.). Institute of Physics Pub.)
 function M = transfer_matrix(k,d,n)
     delta = k*n*d;
     M = [cos(delta),sin(delta)/n*1i;sin(delta)*n*1i,cos(delta)];
 end
 
-function k = bandstructure(w,a,d1,n1,d2,n2)
+function [k,w] = bandstructure(w,a,d1,n1,d2,n2)
     DBR_unit_cell = make_DBR_unit_cells(d1,n1,d2,n2);
     [r,t] = rt_analysis(w,DBR_unit_cell);
     k = [];
@@ -157,7 +93,42 @@ function [r, field] = TMM_analysis(k,parameters,N_mesh)
     r = (1-n_eff) / (1+n_eff);
     
     %   Giving solutions of field
-    field = [flip(x);flip(E)/E(length(E))];
+    field = [flip(x);flip(E)/abs(E_H(1))];
+end
+
+%   Transmission coefficient calculation
+function [r,t] = rt_analysis(K,parameters)
+    
+    %   Giving thickness and refractive index
+    d = parameters(1,:);
+    n = parameters(2,:);
+    
+    t = [];
+    r = [];
+    for j = 1:length(K)
+        %   Defining variables
+        E_H_exit = [1;1]; % E and H fields at the end of the multilayer
+        x = [sum(d)];
+        x_present = sum(d);
+        E = [1];
+        E_H = E_H_exit;
+        
+        %   Calculating the E,H fields with transfer matrices
+        N = length(d);
+        for m=1:N
+            ms = N-m+1;
+            M = transfer_matrix(K(j),d(ms),n(ms));
+            E_H = M * E_H;
+        end
+        field = [x;E/E(length(E))];
+        
+        %   Calculating reflection coefficients
+        n_eff = E_H(2) / E_H(1);
+        r0 = (1-n_eff) / (1+n_eff);
+        t0 = 2 / (E_H(2)+E_H(1));
+        r = [r,r0];
+        t = [t,t0];
+    end
 end
 
 %   Get attenuation factor
@@ -203,6 +174,25 @@ function attenuation = Get_Attenuation(k,parameters,N_mesh)
     attenuation = slope;
 end
 
+function DBR = make_DBR_unit_cells(d1,n1,d2,n2)
+    
+    %   Define list of thickness d and refractive index n
+    d = [];
+    n = [];
+
+    %   Assign element value, first layer is material 1 (d1,n1), second
+    %   layer is material 2 (d2,n2), and so on.
+    for m=1:3
+        if mod(m,2)==1
+            d = [d,d1/2.];
+            n = [n,n1];
+        else
+            d = [d,d2];
+            n = [n,n2];
+        end
+    end
+    DBR = [d;n];
+end
 
 function DBR = make_DBR(d1,n1,d2,n2,N)
     

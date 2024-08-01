@@ -126,12 +126,13 @@ function [r, field] = TMM_analysis(k,parameters,N_mesh)
             end
         end
     end
-    field = [x;E/E(length(E))];
     
     %   Calculating reflection coefficients
     n_eff = E_H(2) / E_H(1);
     r = (1-n_eff) / (1+n_eff);
-
+    
+    %   Giving solutions of field
+    field = [flip(x);flip(E)/abs(E_H(1))];
 end
 
 function DBR = make_DBR(d1,n1,d2,n2,N)
