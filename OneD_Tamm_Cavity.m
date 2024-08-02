@@ -169,9 +169,7 @@ function [k,w] = bandstructure(w,a,d1,n1,d2,n2)
     k = [];
     for i = 1:length(w)
         K = w(i);
-        delta = angle(t(i));
-
-        c_k = cos(K*a - delta)/abs(t(i));
+        c_k = cos(K*(n1*d1+n2*d2))/abs(t(i));
         k = [k, acos(c_k)/a];
     end
 end
