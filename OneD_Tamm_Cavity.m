@@ -59,7 +59,7 @@ Smith_Chart(reflections_Tamm,'Smith Chart (Tamm cavity)')
 %   Calculate Tamm mode field enhancement
 [min_value, w_idx] = min(reflections_Tamm);
 [r_Tamm, field_Tamm] = TMM_analysis(w(w_idx),Tamm,100);
-plot_field('Tamm mode field',field_Tamm,DBR_layer,d_Si,d_Vac)
+plot_field('Tamm mode field enhancement',field_Tamm,DBR_layer,d_Si,d_Vac)
 
 %   Calculate and plot the band structure
 [k,w] = bandstructure(w,a,d_Vac,n_Vac,d_Si,n_Si);
